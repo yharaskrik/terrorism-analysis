@@ -28,7 +28,7 @@ with open('data.csv', 'r') as infile:
         else:
             skipCount += 1
         # print(row[regionIndex])
-        if int(row[yearIndex]) >= 1970 and row[groupNameIndex] and row[locationIndex] and row[groupNameIndex] != 'Unknown' and row[locationIndex] != 'Unknown':
+        if int(row[yearIndex]) >= 2016 and row[groupNameIndex] and row[locationIndex] and row[groupNameIndex] != 'Unknown' and row[locationIndex] != 'Unknown':
 
             if row[groupNameIndex] not in G:
                 # print('Adding: ', row[groupNameIndex])
@@ -44,22 +44,13 @@ with open('data.csv', 'r') as infile:
             else:
                 G.add_weighted_edges_from([(row[groupNameIndex], row[locationIndex], 1)])
 
-            locationList.append(row[locationIndex])
-            groupList.append(row[groupNameIndex])
+            # locationList.append(row[locationIndex])
+            if row[groupNameIndex] not in groupList:
+                groupList.append(row[groupNameIndex])
             count += 1
     # print(G.nodes())
     print(count)
     print('All nodes and edges added')
-
-
-# pos = nx.spring_layout(G)
-# nx.draw_networkx_nodes(G, pos, node_color='b', nodelist=locationList)
-# nx.draw_networkx_nodes(G, pos, node_color='black', nodelist=groupList)
-# print('Nodes drawn')
-# nx.draw_networkx_edges(G, pos, edge_color='r')
-# print('edges drawn')
-# plt.show()
-# print(G.nodes(data=True))
 
 locationWeights = dict()
 
@@ -73,6 +64,37 @@ for node in G.nodes:
         else:
             locationWeights[edge[1]] += edge[2]['weight']
 import operator
-print(sorted(locationWeights.items(), key=operator.itemgetter(1))[-10:])
+sortedLocationList = sorted(locationWeights.items(), key=operator.itemgetter(1))[-50:]
+print(sortedLocationList)
+for l in sortedLocationList:
+    locationList.append(l[0])
+
+print('Length of locations: ', len(locationList))
+print('Length of groups: ', len(groupList))
+# print('Degrees of nodes: ', )
+
+degrees = [(node, val) for (node, val) in G.degree()]
+print(sorted(degrees, key=operator.itemgetter(1))[-20:])
+topGroups = sorted(degrees, key=operator.itemgetter(1))[-20:]
+justGroupNames = [node for (node, val) in topGroups]
+
+edgeList = []
+for l in locationList:
+    for g in justGroupNames:
+        if G.has_edge(g, l):
+            edgeList.append((g, l))
+
+print(edgeList)
+
+subGraph = G.subgraph(locationList + justGroupNames)
+
+pos = nx.spring_layout(subGraph)
+nx.draw_networkx_nodes(subGraph, pos, node_color='blue', nodelist=locationList)
+nx.draw_networkx_nodes(subGraph, pos, node_color='black', nodelist=justGroupNames)
+print('Nodes drawn')
+nx.draw_networkx_edges(subGraph, pos, edge_color='r', edgelist=edgeList)
+print('edges drawn')
+plt.show()
+print(G.nodes(data=True))
 
 print('Done')
