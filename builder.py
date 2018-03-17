@@ -9,11 +9,11 @@ class Builder:
         for index, row in data.iterrows():
 
             if row['gname'] not in G:
-                G.add_node(row['gname'])
+                G.add_node(row['gname'], pos=(1,1))
                 group_list.append(row['gname'])
 
             if row['city'] not in G:
-                G.add_node(row['city'])
+                G.add_node(row['city'], pos=(1,1))
                 location_list.append(row['city'])
 
             if row['city'] in G[row['gname']]:
