@@ -127,8 +127,6 @@ for key in regions:
 
         pprint(spots)
 
-
-
         done = []
         for reg in spots:
             done.append(reg)
