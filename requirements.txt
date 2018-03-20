@@ -1,5 +1,6 @@
 networkx
 matplotlib
 scipy
+pyshp
 pandas
 plotly
