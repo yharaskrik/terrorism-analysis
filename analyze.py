@@ -76,8 +76,9 @@ for key in regions:
     cities = []
 
     group_location = {}
-
     edge_dict = {}
+    Group_G = nx.Graph()
+    Location_G = nx.Graph()
 
     print('Getting all lat and lon, adding city ndoes')
     for index, row in data.iterrows():
@@ -110,13 +111,12 @@ for key in regions:
 
         if city not in edge_dict:
             edge_dict[city] = {gname: 1}
+            Location_G.add_node(city, pos=(lon, lat))
         else:
             if gname not in edge_dict[city]:
                 edge_dict[city][gname] = 1
             else:
                 edge_dict[city][gname] += 1
-
-    Group_G = nx.Graph()
 
     # print(group_location)
     print(groups)
