@@ -65,7 +65,7 @@ for key in regions:
 
     G = nx.DiGraph()
 
-    U_G = nx.Graph()
+    City_G = nx.Graph()
 
     # Filter out the data we do not want based on year and region
     # Also filters out missing and unknown data
@@ -76,9 +76,8 @@ for key in regions:
     cities = []
 
     group_location = {}
+
     edge_dict = {}
-    Group_G = nx.Graph()
-    Location_G = nx.Graph()
 
     print('Getting all lat and lon, adding city ndoes')
     for index, row in data.iterrows():
@@ -89,44 +88,75 @@ for key in regions:
         if not lat or not lon:
             continue
 
-        if row['city'] not in U_G:
-            U_G.add_node(row['city'], pos=(lon, lat), text=row['city'])
+        if row['city'] not in City_G:
+            City_G.add_node(row['city'], pos=(lon, lat), text=row['city'])
             cities.append(row['city'])
 
         if row['gname'] not in groups:
             groups.append(row['gname'])
 
         if row['gname'] not in group_location:
-            group_location[row['gname']] = {'cities': [row['city']], 'count': 1, 'lat': [lat], 'lon': [lon]}
+            group_location[row['gname']] = {'cities': {row['city']: 1}, 'count': 1, 'lat': [lat], 'lon': [lon]}
         elif row['city'] not in group_location[row['gname']]['cities']:
-            group_location[row['gname']]['cities'].append(row['city'])
+            group_location[row['gname']]['cities'][row['city']] = 1
             group_location[row['gname']]['lat'].append(lat)
             group_location[row['gname']]['lon'].append(lon)
             group_location[row['gname']]['count'] += 1
         else:
+            group_location[row['gname']]['cities'][row['city']] += 1
             group_location[row['gname']]['count'] += 1
 
         gname = row['gname']
         city = row['city']
 
         if city not in edge_dict:
-            edge_dict[city] = {gname: 1}
-            Location_G.add_node(city, pos=(lon, lat))
+            edge_dict[city] = [gname]
         else:
             if gname not in edge_dict[city]:
-                edge_dict[city][gname] = 1
-            else:
-                edge_dict[city][gname] += 1
+                edge_dict[city].append(gname)
 
-    # print(group_location)
+    not_if_cound = 0
+    if_count = 0
+    print('Number of cities: ', len(edge_dict.keys()))
+    print(len(edge_dict.keys()) * len(edge_dict.keys()))
+    for outer_city in edge_dict:
+        for inner_city in edge_dict:
+            not_if_cound += 1
+            if outer_city != inner_city and (outer_city, inner_city) not in list(City_G.edges):
+                weight = len(list(set(edge_dict[outer_city]).intersection(edge_dict[inner_city])))
+                City_G.add_weighted_edges_from([(outer_city, inner_city, weight)])
+                if_count += 1
+
+            if not_if_cound % 10000 == 0:
+                print('Not if: ', not_if_cound)
+            if if_count % 10000 == 0:
+                print('If: ', if_count)
+
+    print(if_count)
+    print(not_if_cound)
+    p.fr2(City_G)
+
+    break
+
     print(groups)
 
+    # Building the Group as Node, Shared attacks as edge weights graph
+    Group_G = nx.Graph()
     for item in group_location:
-        # print(item)
-        # print(group_location[item])
         avg_lat = mean(group_location[item]['lat'])
         avg_lon = mean(group_location[item]['lon'])
         Group_G.add_node(item, pos=(avg_lon, avg_lat), text=item)
+
+    not_if_cound = 0
+    if_count = 0
+    for outer_group in group_location:
+        for inner_group in group_location:
+            not_if_cound += 1
+            if outer_group != inner_group:
+                for city in group_location[outer_group]['cities']:
+                    if city in group_location[inner_group]['cities'] and (outer_group, inner_group) not in list(Group_G.edges):
+                        Group_G.add_weighted_edges_from([(outer_group, inner_group, min(group_location[outer_group]['cities'][city], group_location[inner_group]['cities'][city]))])
+                    if_count += 1
 
     p.fr2(Group_G)
 
