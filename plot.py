@@ -1,3 +1,4 @@
+import math
 import networkx as nx
 import plotly.plotly as py
 import plotly
@@ -47,13 +48,23 @@ class Plot:
         pos = nx.get_node_attributes(G, 'pos')
         N = G.nodes
         E = G.edges
-        Xv = [pos[k][0] for k in N]
-        Yv = [pos[k][1] for k in N]
+
+        Xv = [pos[k][0] for k in N if not isinstance(k, float)]
+        Yv = [pos[k][1] for k in N if not isinstance(k, float)]
+
+        print('Nodes after', len(Xv))
+        print('Nodes after', len(Yv))
         Xed = []
         Yed = []
         for edge in E:
+            if isinstance(edge[0], float) or isinstance(edge[1], float):
+                continue
             Xed += [pos[edge[0]][0], pos[edge[1]][0], None]
             Yed += [pos[edge[0]][1], pos[edge[1]][1], None]
+
+        print('Edges after', len(Xed) / 3)
+        print('Edges after', len(Yed) / 3)
+        return
 
         trace3 = Scatter(x=Xed,
                          y=Yed,

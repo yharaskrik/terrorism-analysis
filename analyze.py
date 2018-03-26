@@ -9,12 +9,42 @@ import networkx as nx
 from pprint import pprint
 import matplotlib.pyplot as plt
 from statistics import median, mean
+import multiprocessing
 
 from plot import Plot
 import shapefile
 
+
+def calc_weights(procnum, start, end, data):
+    return_list = []
+    for city in data[start:end]:
+        city_name = next(iter(city))
+
+        for c_city in data[start+1:]:
+            c_city_name = next(iter(c_city))
+            total_shared = 0
+
+            if city_name == c_city_name:
+                continue
+
+            for g in city[city_name]:
+
+                occurance = c_city[c_city_name].count(g)
+                if occurance > 0:
+                    total_shared += 1
+                    c_city[c_city_name].remove(g)
+
+            if total_shared > 0:
+                return_list.append((city_name, c_city_name, total_shared))
+                # print((city_name, c_city_name, total_shared))
+    # print(end)
+    # print(len(data))
+    # print('--------')
+    return return_list
+
+
 regions = {
-    # 'Subset': [10],
+    # 'Subset': [1],
     'Global': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
     'North America': [1],
     'Central America & Caribbean': [2],
@@ -35,7 +65,7 @@ region_name = ['North America', 'Central America & Caribbean', 'South America', 
                'Southeast Asia', 'South Asia', 'Central Asia', 'Western Asia', 'Western Europe',
                'Eastern Europe', 'Middle East & North Africa', 'Sub-Saharan Africa', 'Australasia & Oceania']
 
-min_year = 2000
+min_year = 1970
 
 # number of countries, cells, locations, total number of attacks
 # how much data we actually used
@@ -88,9 +118,10 @@ for key in regions:
         if not lat or not lon:
             continue
 
-        if row['city'] not in City_G:
+        if row['city'] not in City_G and row['city']:
             City_G.add_node(row['city'], pos=(lon, lat), text=row['city'])
             cities.append(row['city'])
+            print(row['city'])
 
         if row['gname'] not in groups:
             groups.append(row['gname'])
@@ -115,30 +146,32 @@ for key in regions:
             if gname not in edge_dict[city]:
                 edge_dict[city].append(gname)
 
-    not_if_cound = 0
-    if_count = 0
-    print('Number of cities: ', len(edge_dict.keys()))
-    print(len(edge_dict.keys()) * len(edge_dict.keys()))
-    for outer_city in edge_dict:
-        for inner_city in edge_dict:
-            not_if_cound += 1
-            if outer_city != inner_city and (outer_city, inner_city) not in list(City_G.edges):
-                weight = len(list(set(edge_dict[outer_city]).intersection(edge_dict[inner_city])))
-                City_G.add_weighted_edges_from([(outer_city, inner_city, weight)])
-                if_count += 1
+    list_of_city_groups = []
+    for city in edge_dict:
+        list_of_city_groups.append({city: edge_dict[city]})
 
-            if not_if_cound % 10000 == 0:
-                print('Not if: ', not_if_cound)
-            if if_count % 10000 == 0:
-                print('If: ', if_count)
+    pool = multiprocessing.Pool()
 
-    print(if_count)
-    print(not_if_cound)
+    results = []
+    loop_Range = len(list_of_city_groups) - 25 if len(list_of_city_groups) > 25 else len(list_of_city_groups)
+    now = time.time()
+    print(len(list_of_city_groups))
+    print(now)
+    for i in range(0, loop_Range):
+        result = pool.apply_async(calc_weights, args=(i, i, i + 25, list_of_city_groups))
+        results += result.get()
+
+    pool.close()
+    pool.join()
+    # print(results)
+    print(len(results))
+    end = time.time()
+    print((end-now) / 60)
+
+    City_G.add_weighted_edges_from(results)
+    print('City nodes', len(City_G.nodes))
+    print('City edges', len(City_G.edges))
     p.fr2(City_G)
-
-    break
-
-    print(groups)
 
     # Building the Group as Node, Shared attacks as edge weights graph
     Group_G = nx.Graph()
@@ -159,33 +192,10 @@ for key in regions:
                     if_count += 1
 
     p.fr2(Group_G)
+    print('Groups nodes', len(Group_G.nodes))
+    print('Groups edges', len(Group_G.edges))
 
     break
-
-    print(U_G.nodes)
-    count = 0
-    print('Data Length:', len(data))
-    print('Group length: ', len(groups))
-    print('Locations length: ', len(cities))
-    for group in groups:
-        sub_data = data[data['gname'] == group]
-
-        for outer_index in range(0, len(sub_data) - 1):
-            outer_row = sub_data.iloc[[outer_index]]
-            outer_city = outer_row['city'].values[0]
-            for inner_index in range(outer_index + 1, len(sub_data)):
-                inner_row = sub_data.iloc[[inner_index]]
-                inner_city = inner_row['city'].values[0]
-                if outer_city != inner_city:
-                    if outer_city not in U_G[inner_city]:
-                        U_G.add_weighted_edges_from([(outer_city, inner_city, 1)])
-                    else:
-                        U_G[outer_city][inner_city]['weight'] += 1
-
-                count += 1
-                if count % 1000 == 0:
-                    print(time.time())
-                    print(len(groups) * len(data) * math.log(len(data), 10), ' - ', count)
 
     print('#Edges:', len(U_G.edges))
     avg_edge_weight = sum([U_G.get_edge_data(*edge)['weight'] for edge in U_G.edges]) / len(U_G.edges)
@@ -204,43 +214,6 @@ for key in regions:
     print(len(U_G.edges))
     p.fr2(U_G, cities)
     break
-
-    if key == 'Global':
-        print('Creating plot for the global terrorist network')
-
-        spots = {}
-        G = nx.Graph()
-        for index in regions[key]:
-            spots[region_name[index - 1]] = {}
-            G.add_node(region_name[index - 1])
-
-        for index, row in data.iterrows():
-            if row.gname in spots[region_name[row.region - 1]]:
-                spots[region_name[row.region - 1]][row.gname] += 1
-            else:
-                spots[region_name[row.region - 1]][row.gname] = 1
-
-        pprint(spots)
-
-        done = []
-        for reg in spots:
-            done.append(reg)
-            for inner_reg in spots:
-                total_weight = 0
-                if inner_reg not in done:
-                    for outer_group in spots[reg]:
-                        if outer_group in spots[inner_reg]:
-                            total_weight += min(spots[reg][outer_group], spots[inner_reg][outer_group])
-
-                if total_weight != 0:
-                    G.add_weighted_edges_from([(reg, inner_reg, total_weight)])
-
-        pos = nx.circular_layout(G)
-        nx.draw_circular(G, with_labels=True)
-        labels = nx.get_edge_attributes(G, 'weight')
-        nx.draw_networkx_edge_labels(G, pos, edge_labels=labels)
-        plt.show()
-        continue
 
     # Continue onto not global stuff as global has too much data.
 
