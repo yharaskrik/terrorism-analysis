@@ -64,7 +64,6 @@ class Plot:
 
         print('Edges after', len(Xed) / 3)
         print('Edges after', len(Yed) / 3)
-        return
 
         trace3 = Scatter(x=Xed,
                          y=Yed,
@@ -134,7 +133,7 @@ class Plot:
         data1 = Data([trace3, trace4, trace5])
         fig1 = Figure(data=data1, layout=layout)
         fig1['layout']['annotations'][0]['text'] = annot
-        plotly.offline.plot(fig1, filename='Coautorship-network-nx.html')
+        # plotly.offline.plot(fig1, filename='Coautorship-network-nx.html')
 
     def fruchterman_reingold(self, G):
         # G = nx.random_geometric_graph(200, 0.125)

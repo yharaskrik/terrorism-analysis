@@ -6,12 +6,13 @@ import math
 import time
 import subgraph
 import networkx as nx
+import collections
 from pprint import pprint
-import matplotlib.pyplot as plt
 from statistics import median, mean
+
+import matplotlib.pyplot as plt
 import multiprocessing
 
-from plot import Plot
 import shapefile
 
 
@@ -44,7 +45,7 @@ def calc_weights(procnum, start, end, data):
 
 
 regions = {
-    # 'Subset': [1],
+    'Subset': [1],
     'Global': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
     'North America': [1],
     'Central America & Caribbean': [2],
@@ -65,7 +66,7 @@ region_name = ['North America', 'Central America & Caribbean', 'South America', 
                'Southeast Asia', 'South Asia', 'Central Asia', 'Western Asia', 'Western Europe',
                'Eastern Europe', 'Middle East & North Africa', 'Sub-Saharan Africa', 'Australasia & Oceania']
 
-min_year = 1970
+min_year = 1984
 
 # number of countries, cells, locations, total number of attacks
 # how much data we actually used
@@ -75,17 +76,32 @@ min_year = 1970
 # average clustering coefficient
 # higher betweenness centrality
 
+# Pre 2000 north america
+# post 2000 north america
+# average path length for each region and global
+# num nodes, num edges
+
+#just global
+# global clustering coefficient
+# betweenness
+# average degree and max degree
+# % max degree
+# % of size of largest component
+# of components
+
 r = file.File()
 f = filter.Filter()
 b = builder.Builder()
 c = calculate.Calculate()
 s = subgraph.SubGraph()
-p = Plot()
+# p = Plot()
 
 # Read the dat into memory
 all_data = r.read_data('data.csv')
 print('Filtering data for min_year = ', min_year)
-all_data = f.filter(all_data, year=min_year)
+all_data = f.filter(all_data, year=min_year, max_year=2000)
+
+r.write_line('# of data rows: ', len(all_data))
 
 for key in regions:
 
@@ -104,6 +120,7 @@ for key in regions:
 
     groups = []
     cities = []
+    countries = []
 
     group_location = {}
 
@@ -118,10 +135,13 @@ for key in regions:
         if not lat or not lon:
             continue
 
+        if row['country'] not in countries:
+            countries.append(row['country'])
+
         if row['city'] not in City_G and row['city']:
             City_G.add_node(row['city'], pos=(lon, lat), text=row['city'])
             cities.append(row['city'])
-            print(row['city'])
+            # print(row['city'])
 
         if row['gname'] not in groups:
             groups.append(row['gname'])
@@ -146,32 +166,36 @@ for key in regions:
             if gname not in edge_dict[city]:
                 edge_dict[city].append(gname)
 
+    if key == 'Global':
+        r.write_line('# Countries: ', len(countries))
+        r.write_line('# Cells: ', len(groups))
+        r.write_line('# Cities: ', len(cities))
+
     list_of_city_groups = []
     for city in edge_dict:
         list_of_city_groups.append({city: edge_dict[city]})
 
-    pool = multiprocessing.Pool()
-
-    results = []
-    loop_Range = len(list_of_city_groups) - 25 if len(list_of_city_groups) > 25 else len(list_of_city_groups)
-    now = time.time()
-    print(len(list_of_city_groups))
-    print(now)
-    for i in range(0, loop_Range):
-        result = pool.apply_async(calc_weights, args=(i, i, i + 25, list_of_city_groups))
-        results += result.get()
-
-    pool.close()
-    pool.join()
+    # pool = multiprocessing.Pool()
+    #
+    # results = []
+    # loop_Range = len(list_of_city_groups) - 25 if len(list_of_city_groups) > 25 else len(list_of_city_groups)
+    # now = time.time()
+    # print(len(list_of_city_groups))
+    # print(now)
+    # for i in range(0, loop_Range):
+    #     result = pool.apply_async(calc_weights, args=(i, i, i + 25, list_of_city_groups))
+    #     results += result.get()
+    # pool.join()
     # print(results)
-    print(len(results))
+    results = calc_weights(0, 0, len(list_of_city_groups), list_of_city_groups)
+    print('Length of results: ', len(results))
     end = time.time()
-    print((end-now) / 60)
-
+    # print((end-now) / 60)
+    print(results)
     City_G.add_weighted_edges_from(results)
     print('City nodes', len(City_G.nodes))
     print('City edges', len(City_G.edges))
-    p.fr2(City_G)
+    # p.fr2(City_G)
 
     # Building the Group as Node, Shared attacks as edge weights graph
     Group_G = nx.Graph()
@@ -191,97 +215,94 @@ for key in regions:
                         Group_G.add_weighted_edges_from([(outer_group, inner_group, min(group_location[outer_group]['cities'][city], group_location[inner_group]['cities'][city]))])
                     if_count += 1
 
-    p.fr2(Group_G)
+    # p.fr2(Group_G)
     print('Groups nodes', len(Group_G.nodes))
     print('Groups edges', len(Group_G.edges))
 
-    break
+    # # Betweenness centrality of the City graph
+    # betweenness_centrality = nx.betweenness_centrality(City_G)
+    # # Remove cells so we only get centrality for locations
+    # betweenness_centrality = f.filter_dict(betweenness_centrality, cities)
+    # sorted_betweenness_centrality = f.sort_dict(betweenness_centrality)
+    # # Outputting the centrality data
+    # r.write_line('City betweenness centralities', sorted_betweenness_centrality[:20])
 
-    print('#Edges:', len(U_G.edges))
-    avg_edge_weight = sum([U_G.get_edge_data(*edge)['weight'] for edge in U_G.edges]) / len(U_G.edges)
-    cut_off = sorted([U_G.get_edge_data(*edge)['weight'] for edge in U_G.edges])[-int(len(U_G.edges) * 0.2):]
-    mean_weight = mean(cut_off)
-    median_weight = median(cut_off)
-    print(median(cut_off))
-    print(mean(cut_off))
-    print(avg_edge_weight)
-
-    edges_to_remove = [edge for edge in U_G.edges if U_G.get_edge_data(*edge)['weight'] < mean_weight]
-    U_G.remove_edges_from(edges_to_remove)
-    # U_G.remove_nodes_from(list(nx.isolates(U_G)))
-    print('#Remove: ', len(edges_to_remove))
-
-    print(len(U_G.edges))
-    p.fr2(U_G, cities)
-    break
-
-    # Continue onto not global stuff as global has too much data.
-
-    # Builds the networkx graph
-    # adds weights = totaling the number of edges between two nodes
-    G, group_list, location_list = b.build_graph(G, data)
-
-    # Convert to undirected graph and calculates the betweenness centrality
-    U_G = nx.to_undirected(G).copy()
-    betweenness_centrality = nx.betweenness_centrality(U_G)
-
+    # Betweenness centrality for the group graph
+    betweenness_centrality = nx.betweenness_centrality(Group_G)
     # Remove cells so we only get centrality for locations
-    betweenness_centrality = f.filter_dict(betweenness_centrality, location_list)
+    betweenness_centrality = f.filter_dict(betweenness_centrality, groups)
     sorted_betweenness_centrality = f.sort_dict(betweenness_centrality)
-
     # Outputting the centrality data
-    r.write_line('Location betweenness centralities', sorted_betweenness_centrality)
+    r.write_line('Group betweenness centralities', sorted_betweenness_centrality[:20])
 
-    # Calculating the degree of just the nodes for locations, total # of attacks on those locations
-    total_location_degrees = c.total_degree(G, location_list)
-    sorted_total_location_degrees = f.sort_list(total_location_degrees)
-
-    # Outputting the total in degree of locations
-    r.write_line('Total in_degree of each location node.', sorted_total_location_degrees)
+    # # Calculating the degree of just the nodes for locations, total # of attacks on those locations
+    # total_location_degrees = c.total_degree(City_G, cities)
+    # sorted_total_location_degrees = f.sort_list(total_location_degrees)
+    # # Outputting the total in degree of locations
+    # r.write_line('Total in_degree of each location node.', sorted_total_location_degrees[:20])
 
     # Calculating total out degree of each cell
-    total_cell_degrees = c.total_degree(G, group_list)
+    total_cell_degrees = c.total_degree(Group_G, groups)
     sorted_total_cell_degrees = f.sort_list(total_cell_degrees)
-
+    avg_degree = mean([x[1] for x in sorted_total_cell_degrees])
+    mediun_degree = median([x[1] for x in sorted_total_cell_degrees])
+    print('Average degree of cells')
+    print(mediun_degree)
+    r.write_line('Average degree of cells', avg_degree)
     # Outputting the total out degree of terrorist cells
-    r.write_line('Total out_degree of each of the terrorist cells', sorted_total_cell_degrees)
-
-    # Converting back to an undirected graph
-    U_G = nx.to_undirected(G).copy()
-
-    # Calculating ties between cells based on total number of shared target-attacks
-    U_G = b.add_weak_ties(U_G, group_list, location_list)
+    r.write_line('Total out_degree of each of the terrorist cells', sorted_total_cell_degrees[:20])
 
     # sorting the local clustering coefficients for the terrorist cells
-    sorted_local_clustering_coefficients = f.sort_dict(nx.clustering(U_G, group_list, weight='weight'))
+    sorted_local_clustering_coefficients = f.sort_dict(nx.clustering(Group_G, groups, weight='weight'))
     top_cells = [l[0] for l in sorted_local_clustering_coefficients[:int(len(sorted_local_clustering_coefficients))]]
-
     # Outputting the sorted local clustering coefficients for the cells
-    r.write_line('Local clustering coefficients for the terrorist cells', sorted_local_clustering_coefficients)
+    r.write_line('Local clustering coefficients for the terrorist cells', sorted_local_clustering_coefficients[:20])
 
-    # Sorting the local clustering coefficients for the locations
-    sorted_local_clustering_coefficients = f.sort_dict(nx.clustering(U_G, location_list, weight='weight'))
+    # sorting the local clustering coefficients for the locations
+    # sorted_local_clustering_coefficients = f.sort_dict(nx.clustering(City_G, cities, weight='weight'))
+    # top_cities = [l[0] for l in sorted_local_clustering_coefficients[:int(len(sorted_local_clustering_coefficients))]]
+    # # Outputting the sorted local clustering coefficients for the cells
+    # r.write_line('Local clustering coefficients for the terrorist cells', sorted_local_clustering_coefficients[:20])
 
-    # Outputting the sorted local clustering coefficients for the cells
-    r.write_line('Local clustering coefficients for the terror locations', sorted_local_clustering_coefficients)
+    connected_graph = Group_G.copy()
 
-    # Making a subgraph of just the cell-cell edges, excluding all locations
-    C_G = s.create_sub_graph(U_G, group_list)
+    avg = 0
+    avg_weight = 0
+    count = 0
+    total = 0
 
-    T_G = s.create_sub_graph(U_G, top_cells)
+    for g in nx.connected_component_subgraphs(connected_graph):
+        if len(g.nodes) > count:
+            avg_weight = nx.average_shortest_path_length(g, weight='weight')
+            avg = nx.average_shortest_path_length(g)
+            count = len(g.nodes)
+        total += 1
+    r.write_line('# Connected subgraphs (cells): ' + key + ': ', total)
+    print('Average: ', avg)
+    print('Average Weight: ', avg_weight)
 
-    p = Plot()
-    p.fruchterman_reingold(T_G)
+    if key == 'Subset':
+        degree_sequence = sorted([d for n, d in Group_G.degree()], reverse=True)  # degree sequence
+        # print "Degree sequence", degree_sequence
+        degreeCount = collections.Counter(degree_sequence)
+        deg, cnt = zip(*degreeCount.items())
+
+        fig, ax = plt.subplots()
+        plt.bar(deg, cnt, width=0.80, color='black')
+
+        plt.title("Degree Histogram")
+        plt.ylabel("Count")
+        plt.xlabel("Degree")
+        # ax.set_xticks([d + 0.4 for d in deg])
+        # ax.set_xticklabels(deg)
+
+        # draw graph in inset
+        plt.axes([0.4, 0.4, 0.5, 0.5])
+        Gcc = sorted(nx.connected_component_subgraphs(Group_G), key=len, reverse=True)[0]
+        pos = nx.spring_layout(Group_G)
+        plt.axis('off')
+        nx.draw_networkx_nodes(Group_G, pos, node_size=20, node_color='black')
+        nx.draw_networkx_edges(Group_G, pos, alpha=0.4)
+        plt.savefig('plot' + str(min_year) + str(key) + '.png')
+        plt.show()
     break
-    # pos = nx.circular_layout(T_G)
-    # nx.draw_circular(T_G, with_labels=False)
-    # labels = nx.get_edge_attributes(T_G, 'weight')
-    # nx.draw_networkx_edge_labels(T_G, pos, edge_labels=labels)
-    # plt.savefig('plots/plot-' + key + 'circular.png')
-
-    # Calculating the clustering coefficients of the cells excluding all locations.
-    sorted_local_clustering_coefficients = f.sort_dict(nx.clustering(C_G, weight='weight'))
-
-    # Outputting the sorted local clustering coefficients for just the cells excluding the locations
-    r.write_line('Local clustering coefficients for the terror cells excluding the locations', sorted_local_clustering_coefficients)
-

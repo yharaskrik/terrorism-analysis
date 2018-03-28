@@ -4,7 +4,7 @@ import operator
 class Filter:
 
     # Filter out the data that we do not want
-    def filter(self, data, year=None, region=None):
+    def filter(self, data, year=None, region=None, max_year=None):
         print('Filtering on: ', year, ' and ', region)
         data = data[(data.gname != None) & (data.city != None) & (data.gname != 'Unknown') & (data.city != 'Unknown')]
 
@@ -12,6 +12,8 @@ class Filter:
             data = data.loc[(data['iyear'] >= year)]
         if region:
             data = data[data['region'].isin(region)]
+        if max_year:
+            data = data.loc[(data['iyear'] < max_year)]
         return data
 
     # Only include dictionary entries that we want to keep
